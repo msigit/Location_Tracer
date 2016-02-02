@@ -3,4 +3,8 @@
     <color name="colorPrimary">#3F51B5</color>
     <color name="colorPrimaryDark">#303F9F</color>
     <color name="colorAccent">#FF4081</color>
+    <color name="app_primary">#3bf2af</color>
+    <color name="app_primary_pressed">#a888e41e</color>
+    <color name="app_ripple">#a215f4</color>
+    <color name="input_warning">#ec0d39</color>
 </resources>
