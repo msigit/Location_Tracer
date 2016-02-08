@@ -78,9 +78,13 @@ public class ConnectionActivity extends Activity {
 //            TextView pv = (TextView) phonetoast.getView().findViewById(android.R.id.message);
 //            pv.setTextColor(Color.WHITE);phonetoast.show();
 //        }
-
-
-            if (!connectionPhone.isEmpty())// && connectionPhone.length() == 11)
+            if(connectionPhone.equals(sharedPreferences.getString(user_Phone,"")))
+            {
+                Toast phonetoast = Toast.makeText(ConnectionActivity.this, "Please avoid intentional attempt", Toast.LENGTH_LONG);
+                TextView pv = (TextView) phonetoast.getView().findViewById(android.R.id.message);
+                pv.setTextColor(Color.WHITE);phonetoast.show();
+            }
+            else if (!connectionPhone.isEmpty())// && connectionPhone.length() == 11)
             {
                 String url = getString(R.string.local_base_url) + "info_by_phone/" + connectionPhone + "";
 

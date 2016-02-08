@@ -21,20 +21,39 @@ public class InternetChecker{
     }
 
 
-    public boolean isInternetConnected()
-    {
-        ConnectivityManager connectivity = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (connectivity != null)
-        {
-            NetworkInfo[] info = connectivity.getAllNetworkInfo();
-            if (info != null)
-                for (int i = 0; i < info.length; i++)
-                    if (info[i].getState() == NetworkInfo.State.CONNECTED)
-                    {
-                        return true;
-                    }
+//    public boolean isInternetConnected()
+//    {
+//        ConnectivityManager connectivity = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+//        if (connectivity != null)
+//        {
+//            NetworkInfo[] info = connectivity.getAllNetworkInfo();
+//            if (info != null)
+//                for (int i = 0; i < info.length; i++)
+//                    if (info[i].getState() == NetworkInfo.State.CONNECTED)
+//                    {
+//                        return true;
+//                    }
+//        }
+//        return false;
+//    }
+
+
+
+    public boolean isInternetConnected() {
+        boolean isConnectedWifi = false;
+        boolean isonnectedMobile = false;
+
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo[] netInfo = cm.getAllNetworkInfo();
+        for (NetworkInfo net : netInfo) {
+            if (net.getTypeName().equalsIgnoreCase("WIFI"))
+                if (net.isConnected())
+                    isConnectedWifi = true;
+            if (net.getTypeName().equalsIgnoreCase("MOBILE"))
+                if (net.isConnected())
+                    isonnectedMobile = true;
         }
-        return false;
+        return isConnectedWifi || isonnectedMobile;
     }
 
 

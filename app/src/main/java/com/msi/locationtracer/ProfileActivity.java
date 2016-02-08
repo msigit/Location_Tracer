@@ -44,8 +44,6 @@ public class ProfileActivity extends Activity {
     EditText editName,editPhone;
     TextView textName,textPhone;
 
-    UserInfoJson userInfoJson;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -64,24 +62,10 @@ public class ProfileActivity extends Activity {
 
 
         if(sharedPreferences.getString(user_Name,"").isEmpty() || sharedPreferences.getString(user_Phone,"").isEmpty()) {
-            editProfile.setVisibility(View.GONE);
-            textName.setVisibility(View.GONE);
-            textPhone.setVisibility(View.GONE);
-            editName.setVisibility(View.VISIBLE);
-            editPhone.setVisibility(View.VISIBLE);
-            saveProfile.setVisibility(View.VISIBLE);
+            profileSet();
         }
-        else
-        {
-            editName.setVisibility(View.GONE);
-            editPhone.setVisibility(View.GONE);
-            saveProfile.setVisibility(View.GONE);
-            editProfile.setVisibility(View.VISIBLE);
-            textName.setVisibility(View.VISIBLE);
-            textPhone.setVisibility(View.VISIBLE);
-
-            textName.setText(sharedPreferences.getString(user_Name,"").toString());
-            textPhone.setText(sharedPreferences.getString(user_Phone,"").toString());
+        else {
+            saveAction();
         }
 
 
@@ -89,8 +73,6 @@ public class ProfileActivity extends Activity {
             @Override
             public void onClick(View v) {
                 editAction();
-                editName.setText(sharedPreferences.getString(user_Name, "").toString());
-                editPhone.setText(sharedPreferences.getString(user_Phone, "").toString());
             }
         });
 
@@ -103,12 +85,10 @@ public class ProfileActivity extends Activity {
         });
     }
 
+    private void profileSave() {
 
-    private void profileSave()
-    {
         final String newName = editName.getText().toString().trim();
         final String newPhone = editPhone.getText().toString().trim();
-
 
         if(newName.isEmpty())
         {
@@ -118,15 +98,15 @@ public class ProfileActivity extends Activity {
             nv.setTextColor(Color.WHITE);nametoast.show();
         }
 
-       else if( newPhone.length() < 11)
-        {
-            editAction();
-            Toast phonetoast = Toast.makeText(this, "Phone number must be 11 digit", Toast.LENGTH_LONG);
-            TextView pv = (TextView) phonetoast.getView().findViewById(android.R.id.message);
-            pv.setTextColor(Color.WHITE);phonetoast.show();
-        }
+//       else if( newPhone.length() < 11)
+//        {
+//            editAction();
+//            Toast phonetoast = Toast.makeText(this, "Phone number must be 11 digit", Toast.LENGTH_LONG);
+//            TextView pv = (TextView) phonetoast.getView().findViewById(android.R.id.message);
+//            pv.setTextColor(Color.WHITE);phonetoast.show();
+//        }
 
-        if(!newName.isEmpty() && !newPhone.isEmpty() && newPhone.length() == 11)
+        if(!newName.isEmpty() && !newPhone.isEmpty())// && newPhone.length() == 11)
         {
             String deviceID = sharedPreferences.getString(device_Id,"");
             String url = getString(R.string.local_base_url)+"info/"+deviceID+"";
@@ -152,6 +132,10 @@ public class ProfileActivity extends Activity {
                                     textName.setText(sharedPreferences.getString(user_Name, "").toString());
                                     textPhone.setText(sharedPreferences.getString(user_Phone, "").toString());
                                 }
+                                else if(statCode.equals("404"))
+                                {
+
+                                }
                             }
                             catch (Exception e)
                             {
@@ -163,7 +147,6 @@ public class ProfileActivity extends Activity {
                         @Override
                         public void onErrorResponse(VolleyError error) {
 
-                            Log.e("Error",error.toString());
                         }
                     }
             )
@@ -182,25 +165,76 @@ public class ProfileActivity extends Activity {
         }
     }
 
+    private void profileSet() {
+        String url = getString(R.string.local_base_url)+"info/"+sharedPreferences.getString(device_Id,"")+"";
 
-    private void saveAction()
-    {
+        RequestQueue requestQueue = Volley.newRequestQueue(ProfileActivity.this);
+        StringRequest getRequest = new StringRequest(Request.Method.GET, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        try
+                        {
+                            JSONObject jsonResponse = new JSONObject(response);
+                            String statCode = jsonResponse.getString("code");
+                            JSONObject Data = jsonResponse.getJSONObject("data");
+
+                            if(statCode.equals("200"))
+                            {
+                                String userName = Data.getString("User_name");
+                                String userPhone = Data.getString("Phone_number");
+
+                                if(!userName.isEmpty() && !userPhone.isEmpty()) {
+
+                                    editor.putString(user_Name, userName);
+                                    editor.putString(user_Phone, userPhone);
+                                    editor.commit();
+
+                                    saveAction();
+                                }
+                                else if(userName.isEmpty() || userPhone.isEmpty()) {
+                                    editAction();
+                                }
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            e.printStackTrace();
+                        }
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+
+                    }
+                });
+        requestQueue.add(getRequest);
+    }
+
+    private void saveAction() {
+
         editName.setVisibility(View.GONE);
         editPhone.setVisibility(View.GONE);
         saveProfile.setVisibility(View.GONE);
         textName.setVisibility(View.VISIBLE);
         textPhone.setVisibility(View.VISIBLE);
         editProfile.setVisibility(View.VISIBLE);
+
+        textName.setText(sharedPreferences.getString(user_Name, "").toString());
+        textPhone.setText(sharedPreferences.getString(user_Phone, "").toString());
     }
 
+    private void editAction() {
 
-    private void editAction()
-    {
         textName.setVisibility(View.GONE);
         textPhone.setVisibility(View.GONE);
         editProfile.setVisibility(View.GONE);
         editName.setVisibility(View.VISIBLE);
         editPhone.setVisibility(View.VISIBLE);
         saveProfile.setVisibility(View.VISIBLE);
+
+        editName.setText(sharedPreferences.getString(user_Name, "").toString());
+        editPhone.setText(sharedPreferences.getString(user_Phone, "").toString());
     }
 }

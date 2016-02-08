@@ -12,6 +12,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.provider.Settings;
 import android.support.annotation.Nullable;
+import android.util.Log;
 
 import com.msi.locationtracer.R;
 
@@ -31,7 +32,7 @@ public class GpsTracker extends Service implements LocationListener {
     private boolean canGetLocation;
 
     private static final long minDistanceForUpdate = 2;
-    private static final long minTimeBitweenUpdate = 1000 * 30;
+    private static final long minTimeBitweenUpdate = 1000 * 20;
 
     private InternetChecker internetChecker;
 
@@ -143,6 +144,7 @@ public class GpsTracker extends Service implements LocationListener {
 
     @Override
     public void onLocationChanged(Location location) {
+
     }
 
     @Override

@@ -4,12 +4,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.View;
+import android.widget.TextView;
+import android.widget.Toast;
 
 
 import com.android.volley.Request;
@@ -26,12 +29,16 @@ import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.msi.locationtracer.Adapters.LocatorListAdapter;
 import com.msi.locationtracer.ApplicationHelper.DirectionsJsonParser;
 import com.msi.locationtracer.ApplicationHelper.LocationPublisher;
+import com.msi.locationtracer.Data_Model.UserInfo;
 import com.msi.locationtracer.JsonParser.UserInfoJson;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -50,20 +57,21 @@ public class MainActivity extends AppCompatActivity {
     private GoogleMap googleMap;
     private double UserLat;
     private double UserLng;
-    private double PlaceLat;
-    private double PlaceLng;
+    private double GuestLat;
+    private double GuestLng;
+    private LatLng GuestlatLng;
 
     SharedPreferences sharedPreferences;
     SharedPreferences.Editor editor;
     private static final String Shared_Name = "user_profile";
     private static final String device_Id = "device_Id";
-
-    UserInfoJson userInfoJson = new UserInfoJson();
-
+    private static final String user_Name = "user_Name";
+    private static final String user_Phone = "user_Phone";
 
     private ArrayList<LatLng> markarpoints;
 
-    boolean tempIndicator = true;
+    private String guest_device_Id;
+    private String guest_user_Name;
 
     FloatingActionButton flatProfile,flatLocation,flatConnection ;
     FloatingActionMenu flatMenu;
@@ -79,40 +87,26 @@ public class MainActivity extends AppCompatActivity {
 
         LocationPublisher locationPublisher = new LocationPublisher(MainActivity.this);
         UserLat = locationPublisher.LocationProvider().getUserLatitude();
-        UserLng =locationPublisher.LocationProvider().getUserLongitude();
-        PlaceLat = 23.797741;
-        PlaceLng = 90.369156;
+        UserLng = locationPublisher.LocationProvider().getUserLongitude();
 
-        markarpoints = new ArrayList<LatLng>();
+
+        Intent intent = getIntent();
+        if(intent.hasExtra("guest_device_Id")){
+            Bundle bundle = getIntent().getExtras();
+            if(!bundle.getString("guest_device_Id").equals(null) && !bundle.getString("guest_user_Name").equals(null)){
+                guest_user_Name = bundle.getString("guest_user_Name");
+                guest_device_Id = bundle.getString("guest_device_Id");
+            }
+            else
+            {
+                guest_device_Id = null;
+            }
+        }
+
+        //markarpoints = new ArrayList<LatLng>();
 
         deviceCheck();
-        LoadMap();
-
-        googleMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
-            @Override
-            public void onMapClick(LatLng latLng) {
-                //TapLocation(latLng);
-            }
-        });
-
-//        new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-//                while (true){
-//                    if(tempIndicator) {
-//                        final String url = getDirectionsUrl(new LatLng(UserLat, UserLng), new LatLng(PlaceLat += .123, PlaceLng += 0.1234));
-//                        final DownloadTask downloadTask = new DownloadTask();
-//                        downloadTask.execute(url);
-//                    }
-//                    try {
-//                        Thread.sleep(5000);
-//                    } catch (InterruptedException e) {
-//                        e.printStackTrace();
-//                    }
-//                }
-//            }
-//        }).start();
-
+        defaultMap(UserLat,UserLng);
 
         flatProfile = (FloatingActionButton) findViewById(R.id.flatProfile);
         flatLocation = (FloatingActionButton) findViewById(R.id.flatLocation);
@@ -131,7 +125,7 @@ public class MainActivity extends AppCompatActivity {
         flatConnection.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this,ConnectionActivity.class);
+                Intent intent = new Intent(MainActivity.this, ConnectionActivity.class);
                 startActivity(intent);
                 flatMenu.close(true);
             }
@@ -140,73 +134,97 @@ public class MainActivity extends AppCompatActivity {
         flatLocation.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this,LocatorsActivity.class);
+                Intent intent = new Intent(MainActivity.this, LocatorsActivity.class);
                 startActivity(intent);
                 flatMenu.close(true);
             }
         });
 
-    }
-
-
-    private void deviceCheck()
-    {
-        if(sharedPreferences.getString(device_Id,"").toString().isEmpty())
-        {
-            TelephonyManager telephonyManager = (TelephonyManager)getSystemService(Context.TELEPHONY_SERVICE);
-            final String deviceID = telephonyManager.getDeviceId();
-
-
-                String url = getString(R.string.local_base_url)+"info";
-
-                RequestQueue requestQueue = Volley.newRequestQueue(MainActivity.this);
-                StringRequest putRequest = new StringRequest(Request.Method.PUT, url,
-                        new Response.Listener<String>() {
-                            @Override
-                            public void onResponse(String response) {
-
-                                try
-                                {
-                                    JSONObject jsonResponse = new JSONObject(response);
-                                   String statCode = jsonResponse.getString("code");
-
-                                    if(statCode.equals("200") || statCode.equals("409"))
-                                    {
-                                        editor.putString(device_Id, deviceID);
-                                        editor.commit();
-                                    }
-                                }
-
-                                catch (Exception e)
-                                {
-                                    e.printStackTrace();
-                                }
-                            }
-                        },
-                        new Response.ErrorListener() {
-                            @Override
-                            public void onErrorResponse(VolleyError error) {
-
-                            }
-                        }
-                )
-
-                {
-                    @Override
-                    protected Map<String, String> getParams()
-                    {
-                        Map<String, String> params = new HashMap<String,String>();
-                        params.put("Device_ID",deviceID);
-                        params.put("Status","active");
-                        return params;
-                    }
-                };
-
-                requestQueue.add(putRequest);
+        googleMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(LatLng latLng) {
+               // putUserLocation(latLng);
+                //TapLocation(latLng);
+                flatMenu.close(true);
             }
+        });
+
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (true){
+                    try
+                    {
+                        if(guest_device_Id.equals(null))
+                        {
+                            Log.e("Default","Checked");
+                            defaultMap(UserLat,UserLng);
+                        }
+                        else if(!guest_device_Id.equals(null))
+                        {
+                                String url = getString(R.string.local_base_url)+"guest_location/"+guest_device_Id+"";
+
+                                RequestQueue requestQueue = Volley.newRequestQueue(MainActivity.this);
+                                StringRequest getRequest = new StringRequest(Request.Method.GET, url,
+                                        new Response.Listener<String>() {
+                                            @Override
+                                            public void onResponse(String response) {
+                                                try
+                                                {
+                                                    JSONObject jsonResponse = new JSONObject(response);
+                                                    String statCode = jsonResponse.getString("code");
+                                                    JSONObject Data = jsonResponse.getJSONObject("data");
+
+                                                    if(statCode.equals("200"))
+                                                    {
+                                                        GuestLat = Data.getDouble("Current_latitude");
+                                                        GuestLng = Data.getDouble("Current_longitude");
+
+                                                        final String directinUrl = getDirectionsUrl(new LatLng(UserLat, UserLng), new LatLng(GuestLat, GuestLng));
+                                                        final DownloadTask downloadTask = new DownloadTask();
+                                                        downloadTask.execute(directinUrl);
+
+                                                        LoadLocationMap(new LatLng(UserLat, UserLng), new LatLng(GuestLat, GuestLng));
+                                                       // putUserLocation(new LatLng(UserLat, UserLng));
+                                                    }
+                                                    else if(statCode.equals("404")) {
+                                                    }
+                                                }
+                                                catch (Exception e)
+                                                {
+                                                    e.printStackTrace();
+                                                }
+                                            }
+                                        },
+                                        new Response.ErrorListener() {
+                                            @Override
+                                            public void onErrorResponse(VolleyError error) {
+
+                                            }
+                                        });
+                                requestQueue.add(getRequest);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
+
+                    try
+                    {
+                        Thread.sleep(15000);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }).start();
+
     }
 
-    public void LoadMap() {
+    private void LoadLocationMap(final LatLng Userlatlang,final LatLng Guestlatlang) {
+
         try {
             if (googleMap == null) {
                 googleMap = ((MapFragment) getFragmentManager().findFragmentById(R.id.map)).getMap();
@@ -220,26 +238,67 @@ public class MainActivity extends AppCompatActivity {
 
 
             googleMap.addMarker(new MarkerOptions()
-                    .position(new LatLng(UserLat, UserLng))
-                    .title("My Position")
+                    .position(Userlatlang).title("My Position")
                     .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
             // fromBitmap(BitmapFactory.decodeResource(getResources(),R.drawable.terrain)))); //
 
             googleMap.addMarker(new MarkerOptions()
-                    .position(new LatLng(PlaceLat, PlaceLng))
-                    .title("Other Position")
+                    .position(Guestlatlang).title(guest_user_Name)
                     .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)));
 
             CameraPosition cameraPosition = new CameraPosition.Builder()
-                    .target(new LatLng(PlaceLat, PlaceLng)).zoom(16).build();
+                    .zoom(14).build();//.target(Guestlatlang);
             googleMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public void TapLocation(LatLng latLng)
-    {
+    private void defaultMap(double UserLat,double UserLng) {
+
+        try {
+            if (googleMap == null) {
+                googleMap = ((MapFragment) getFragmentManager().findFragmentById(R.id.map)).getMap();
+            }
+
+            googleMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
+            googleMap.getUiSettings().setZoomControlsEnabled(true);
+            googleMap.getUiSettings().setCompassEnabled(true);
+            googleMap.getUiSettings().setMyLocationButtonEnabled(true);
+            googleMap.setMyLocationEnabled(true);
+
+            googleMap.addMarker(new MarkerOptions()
+                    .position(new LatLng(UserLat, UserLng))
+                    .title("My Position")
+                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
+            // fromBitmap(BitmapFactory.decodeResource(getResources(),R.drawable.terrain)))); //
+
+            CameraPosition cameraPosition = new CameraPosition.Builder()
+                    .target(new LatLng(UserLat, UserLng)).zoom(16).build();
+            googleMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void deviceCheck() {
+        TelephonyManager telephonyManager = (TelephonyManager)getSystemService(Context.TELEPHONY_SERVICE);
+        final String deviceID = telephonyManager.getDeviceId();
+
+        if(sharedPreferences.getString(device_Id,"").toString().isEmpty())
+        {
+            putNewDevice(deviceID);
+        }
+        else if(!sharedPreferences.getString(device_Id,"").toString().isEmpty())
+        {
+            if(sharedPreferences.getString(device_Id,"").equals(deviceID))
+            {
+
+            }
+        }
+    }
+
+    public void TapLocation(LatLng latLng) {
         MarkerOptions markerOptions = new MarkerOptions();
         markerOptions.position(latLng);
         markerOptions.title(latLng.latitude + " : " + latLng.longitude);
@@ -297,7 +356,6 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
-            tempIndicator = false;
         }
 
         // Downloading data in non-ui thread
@@ -380,7 +438,7 @@ public class MainActivity extends AppCompatActivity {
                 // Adding all the points in the route to LineOptions
                 lineOptions.addAll(points);
                 lineOptions.width(8);
-                lineOptions.color(Color.BLUE);
+                lineOptions.color(getResources().getColor(R.color.direction_line));
             }
 
             try{
@@ -390,7 +448,106 @@ public class MainActivity extends AppCompatActivity {
             catch (Exception e){}
             // Drawing polyline in the Google Map for the i-th route
 
-            tempIndicator = true;
+
         }
     }
+
+    private void putNewDevice(final String deviceID) {
+        String url = getString(R.string.local_base_url)+"info";
+
+        RequestQueue requestQueue = Volley.newRequestQueue(MainActivity.this);
+        StringRequest putRequest = new StringRequest(Request.Method.PUT, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+
+                        try
+                        {
+                            JSONObject jsonResponse = new JSONObject(response);
+                            String statCode = jsonResponse.getString("code");
+
+                            if(statCode.equals("200") || statCode.equals("409"))
+                            {
+                                editor.putString(device_Id, deviceID);
+                                editor.commit();
+                            }
+                        }
+
+                        catch (Exception e)
+                        {
+                            e.printStackTrace();
+                        }
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+
+                    }
+                }
+        )
+
+        {
+            @Override
+            protected Map<String, String> getParams()
+            {
+                Map<String, String> params = new HashMap<String,String>();
+                params.put("Device_ID",deviceID);
+                params.put("Status","active");
+                return params;
+            }
+        };
+
+        requestQueue.add(putRequest);
+    }
+
+    private void putUserLocation(final LatLng latLng) {
+        String url = getString(R.string.local_base_url)+"latlon";
+
+        RequestQueue requestQueue = Volley.newRequestQueue(MainActivity.this);
+        StringRequest putRequest = new StringRequest(Request.Method.PUT, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+
+                        try
+                        {
+                            JSONObject jsonResponse = new JSONObject(response);
+                            String statCode = jsonResponse.getString("code");
+
+                            if(statCode.equals("200") || statCode.equals("409"))
+                            {
+
+                            }
+                        }
+
+                        catch (Exception e)
+                        {
+                            e.printStackTrace();
+                        }
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+
+                    }
+                }
+        )
+
+        {
+            @Override
+            protected Map<String, String> getParams()
+            {
+                Map<String, String> params = new HashMap<String,String>();
+                params.put("User_Device_ID",sharedPreferences.getString(device_Id,""));
+                params.put("Current_latitude", Double.toString(latLng.latitude));
+                params.put("Current_longitude",Double.toString(latLng.longitude));
+                return params;
+            }
+        };
+
+        requestQueue.add(putRequest);
+    }
+
 }
