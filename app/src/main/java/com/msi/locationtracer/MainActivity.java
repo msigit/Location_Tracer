@@ -5,7 +5,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.location.Location;
 import android.os.AsyncTask;
+import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.telephony.TelephonyManager;
@@ -32,10 +34,12 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.maps.android.SphericalUtil;
 import com.msi.locationtracer.Adapters.LocatorListAdapter;
 import com.msi.locationtracer.ApplicationHelper.DirectionsJsonParser;
 import com.msi.locationtracer.ApplicationHelper.LocationPublisher;
 import com.msi.locationtracer.Data_Model.UserInfo;
+import com.msi.locationtracer.Data_Model.UserLocation;
 import com.msi.locationtracer.JsonParser.UserInfoJson;
 
 import org.json.JSONArray;
@@ -47,6 +51,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -55,8 +60,11 @@ import java.util.Map;
 public class MainActivity extends AppCompatActivity {
 
     private GoogleMap googleMap;
+
     private double UserLat;
     private double UserLng;
+    private double TemLat;
+    private double TemLng;
     private double GuestLat;
     private double GuestLng;
     private LatLng GuestlatLng;
@@ -65,17 +73,14 @@ public class MainActivity extends AppCompatActivity {
     SharedPreferences.Editor editor;
     private static final String Shared_Name = "user_profile";
     private static final String device_Id = "device_Id";
-    private static final String user_Name = "user_Name";
-    private static final String user_Phone = "user_Phone";
+    private static final String TempLat = "TempLat";
+    private static final String TempLang = "TempLang";
 
-    private ArrayList<LatLng> markarpoints;
-
-    private String guest_device_Id;
+    private String guest_device_Id = "0";
     private String guest_user_Name;
 
     FloatingActionButton flatProfile,flatLocation,flatConnection ;
     FloatingActionMenu flatMenu;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -99,7 +104,7 @@ public class MainActivity extends AppCompatActivity {
             }
             else
             {
-                guest_device_Id = null;
+                guest_device_Id = "0";
             }
         }
 
@@ -156,12 +161,12 @@ public class MainActivity extends AppCompatActivity {
                 while (true){
                     try
                     {
-                        if(guest_device_Id.equals(null))
+                        if(guest_device_Id.equals(null) || guest_device_Id.equals("0"))
                         {
-                            Log.e("Default","Checked");
-                            defaultMap(UserLat,UserLng);
+                            defaultMap(UserLat, UserLng);
+                            checkUserLocation(new LatLng(UserLat, UserLng));
                         }
-                        else if(!guest_device_Id.equals(null))
+                        else if(!guest_device_Id.equals(null) && !guest_device_Id.equals("0"))
                         {
                                 String url = getString(R.string.local_base_url)+"guest_location/"+guest_device_Id+"";
 
@@ -170,23 +175,28 @@ public class MainActivity extends AppCompatActivity {
                                         new Response.Listener<String>() {
                                             @Override
                                             public void onResponse(String response) {
-                                                try
-                                                {
+                                                try {
                                                     JSONObject jsonResponse = new JSONObject(response);
                                                     String statCode = jsonResponse.getString("code");
                                                     JSONObject Data = jsonResponse.getJSONObject("data");
 
-                                                    if(statCode.equals("200"))
-                                                    {
+                                                    if(statCode.equals("200")) {
                                                         GuestLat = Data.getDouble("Current_latitude");
                                                         GuestLng = Data.getDouble("Current_longitude");
 
-                                                        final String directinUrl = getDirectionsUrl(new LatLng(UserLat, UserLng), new LatLng(GuestLat, GuestLng));
-                                                        final DownloadTask downloadTask = new DownloadTask();
-                                                        downloadTask.execute(directinUrl);
+                                                        runOnUiThread(new Runnable() {
+                                                            @Override
+                                                            public void run() {
+                                                                googleMap.clear();
+                                                                LoadLocationMap(new LatLng(UserLat, UserLng), new LatLng(GuestLat, GuestLng));
+                                                                final String directinUrl = getDirectionsUrl(new LatLng(UserLat, UserLng), new LatLng(GuestLat, GuestLng));
+                                                                final DownloadTask downloadTask = new DownloadTask();
+                                                                downloadTask.execute(directinUrl);
+                                                            }
+                                                        });
 
-                                                        LoadLocationMap(new LatLng(UserLat, UserLng), new LatLng(GuestLat, GuestLng));
-                                                       // putUserLocation(new LatLng(UserLat, UserLng));
+                                                         checkUserLocation(new LatLng(UserLat, UserLng));
+
                                                     }
                                                     else if(statCode.equals("404")) {
                                                     }
@@ -213,18 +223,16 @@ public class MainActivity extends AppCompatActivity {
 
                     try
                     {
-                        Thread.sleep(15000);
+                        Thread.sleep(1000*30);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
                 }
             }
         }).start();
-
     }
 
     private void LoadLocationMap(final LatLng Userlatlang,final LatLng Guestlatlang) {
-
         try {
             if (googleMap == null) {
                 googleMap = ((MapFragment) getFragmentManager().findFragmentById(R.id.map)).getMap();
@@ -247,7 +255,8 @@ public class MainActivity extends AppCompatActivity {
                     .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)));
 
             CameraPosition cameraPosition = new CameraPosition.Builder()
-                    .zoom(14).build();//.target(Guestlatlang);
+                    .target(Guestlatlang).zoom(13).build();
+
             googleMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
         } catch (Exception e) {
             e.printStackTrace();
@@ -285,17 +294,58 @@ public class MainActivity extends AppCompatActivity {
         TelephonyManager telephonyManager = (TelephonyManager)getSystemService(Context.TELEPHONY_SERVICE);
         final String deviceID = telephonyManager.getDeviceId();
 
-        if(sharedPreferences.getString(device_Id,"").toString().isEmpty())
-        {
-            putNewDevice(deviceID);
-        }
-        else if(!sharedPreferences.getString(device_Id,"").toString().isEmpty())
-        {
-            if(sharedPreferences.getString(device_Id,"").equals(deviceID))
-            {
+        String url = getString(R.string.local_base_url)+"info/"+deviceID+"";
 
-            }
-        }
+        RequestQueue requestQueue = Volley.newRequestQueue(MainActivity.this);
+        StringRequest getRequest = new StringRequest(Request.Method.GET, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        try {
+                            JSONObject jsonResponse = new JSONObject(response);
+                            String statCode = jsonResponse.getString("code");
+
+                            if(statCode.equals("200")) {
+                                JSONObject Data = jsonResponse.getJSONObject("data");
+
+                                if(Data.getDouble("Device_ID") == Double.parseDouble(deviceID) ) {
+                                    editor.putString(device_Id, deviceID);
+                                    editor.commit();
+                                }
+                            }
+                            else if(statCode.equals("404")) {
+                                putNewDevice(deviceID);
+                            }
+                        }
+                        catch (Exception e) {
+                            Log.e("deviceCheck Exception",e.toString());
+                        }
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        Log.e("deviceCheck Error",error.toString());
+                    }
+                });
+        requestQueue.add(getRequest);
+
+
+
+
+//        if(sharedPreferences.getString(device_Id,"").toString().isEmpty())
+//        {
+//            editor.putString(device_Id, deviceID);
+//            editor.commit();
+//            putNewDevice(deviceID);
+//        }
+//        else if(!sharedPreferences.getString(device_Id,"").toString().isEmpty())
+//        {
+//            if(sharedPreferences.getString(device_Id,"").equals(deviceID))
+//            {
+//
+//            }
+//        }
     }
 
     public void TapLocation(LatLng latLng) {
@@ -442,12 +492,10 @@ public class MainActivity extends AppCompatActivity {
             }
 
             try{
-                googleMap.clear();
                 googleMap.addPolyline(lineOptions);
             }
             catch (Exception e){}
             // Drawing polyline in the Google Map for the i-th route
-
 
         }
     }
@@ -461,8 +509,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onResponse(String response) {
 
-                        try
-                        {
+                        try {
                             JSONObject jsonResponse = new JSONObject(response);
                             String statCode = jsonResponse.getString("code");
 
@@ -473,26 +520,26 @@ public class MainActivity extends AppCompatActivity {
                             }
                         }
 
-                        catch (Exception e)
-                        {
-                            e.printStackTrace();
+                        catch (Exception e) {
+                            Log.e("putNewDevice Exception", e.toString());
                         }
                     }
                 },
                 new Response.ErrorListener() {
                     @Override
                     public void onErrorResponse(VolleyError error) {
-
+                        Log.e("putNewDevice Error",error.toString());
                     }
                 }
         )
-
         {
             @Override
             protected Map<String, String> getParams()
             {
                 Map<String, String> params = new HashMap<String,String>();
                 params.put("Device_ID",deviceID);
+                params.put("User_name","");
+                params.put("Phone_number","");
                 params.put("Status","active");
                 return params;
             }
@@ -501,29 +548,39 @@ public class MainActivity extends AppCompatActivity {
         requestQueue.add(putRequest);
     }
 
-    private void putUserLocation(final LatLng latLng) {
-        String url = getString(R.string.local_base_url)+"latlon";
+    private void checkUserLocation(final LatLng latLng){
+
+        String url = getString(R.string.local_base_url)+"guest_location/"+sharedPreferences.getString(device_Id,"")+"";
 
         RequestQueue requestQueue = Volley.newRequestQueue(MainActivity.this);
-        StringRequest putRequest = new StringRequest(Request.Method.PUT, url,
+        StringRequest getRequest = new StringRequest(Request.Method.GET, url,
                 new Response.Listener<String>() {
                     @Override
                     public void onResponse(String response) {
-
-                        try
-                        {
+                        try {
                             JSONObject jsonResponse = new JSONObject(response);
                             String statCode = jsonResponse.getString("code");
 
-                            if(statCode.equals("200") || statCode.equals("409"))
-                            {
+                            if(statCode.equals("200")) {
+                                JSONObject Data = jsonResponse.getJSONObject("data");
+                                TemLat = Data.getDouble("Current_latitude");
+                                TemLng = Data.getDouble("Current_longitude");
 
+                                Log.e("Distance", String.valueOf(SphericalUtil.computeDistanceBetween(new LatLng(TemLat, TemLng), latLng)));
+
+
+                                if(SphericalUtil.computeDistanceBetween(new LatLng(TemLat,TemLng),latLng) >= 10.00) {
+                                    setUserLocation(latLng);
+                                    Log.e("Distance if", String.valueOf(SphericalUtil.computeDistanceBetween(new LatLng(TemLat, TemLng), latLng)));
+                                }
+                            }
+                            else if(statCode.equals("404")) {
+                                setUserLocation(latLng);
                             }
                         }
-
                         catch (Exception e)
                         {
-                            e.printStackTrace();
+                            Log.e("checkLocation Exception", e.toString());
                         }
                     }
                 },
@@ -531,23 +588,59 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onErrorResponse(VolleyError error) {
 
+                        Log.e("checkLocation Error",error.toString());
+
                     }
-                }
-        )
-
-        {
-            @Override
-            protected Map<String, String> getParams()
-            {
-                Map<String, String> params = new HashMap<String,String>();
-                params.put("User_Device_ID",sharedPreferences.getString(device_Id,""));
-                params.put("Current_latitude", Double.toString(latLng.latitude));
-                params.put("Current_longitude",Double.toString(latLng.longitude));
-                return params;
-            }
-        };
-
-        requestQueue.add(putRequest);
+                });
+        requestQueue.add(getRequest);
     }
 
+    private void setUserLocation(final LatLng latLng) {
+
+            String url = getString(R.string.local_base_url) + "latlon";
+
+            RequestQueue requestQueue = Volley.newRequestQueue(MainActivity.this);
+            StringRequest putRequest = new StringRequest(Request.Method.PUT, url,
+                    new Response.Listener<String>() {
+                        @Override
+                        public void onResponse(String response) {
+
+                            try {
+                                JSONObject jsonResponse = new JSONObject(response);
+                                String statCode = jsonResponse.getString("code");
+
+                                if (statCode.equals("200") || statCode.equals("409")) {
+
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    },
+                    new Response.ErrorListener() {
+                        @Override
+                        public void onErrorResponse(VolleyError error) {
+
+                        }
+                    }
+            )
+
+            {
+                @Override
+                protected Map<String, String> getParams() {
+                    Map<String, String> params = new HashMap<String, String>();
+                    params.put("User_Device_ID", sharedPreferences.getString(device_Id, ""));
+                    params.put("Current_latitude", Double.toString(latLng.latitude));
+                    params.put("Current_longitude", Double.toString(latLng.longitude));
+                    return params;
+                }
+            };
+            requestQueue.add(putRequest);
+    }
 }
+
+
+//   DELETE FROM `latlon_table` WHERE `User_Device_ID` = '359380061056985';
+
+
+

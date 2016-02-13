@@ -31,8 +31,8 @@ public class GpsTracker extends Service implements LocationListener {
     private boolean isNetworkEnabled;
     private boolean canGetLocation;
 
-    private static final long minDistanceForUpdate = 2;
-    private static final long minTimeBitweenUpdate = 1000 * 20;
+    private static final long minDistanceForUpdate = 10;
+    private static final long minTimeBitweenUpdate = 1000 * 30;
 
     private InternetChecker internetChecker;
 
@@ -140,19 +140,24 @@ public class GpsTracker extends Service implements LocationListener {
     }
 
 
-
-
     @Override
     public void onLocationChanged(Location location) {
-
+        if (!location.hasAccuracy()) {
+            return;
+        }
+        if (location.getAccuracy() > 5) {
+            return;
+        }
     }
 
     @Override
     public void onStatusChanged(String provider, int status, Bundle extras) {
+        Log.e("provider",provider+" "+status+" "+extras);
     }
 
     @Override
     public void onProviderEnabled(String provider) {
+        Log.e("provider",provider);
     }
 
     @Override

@@ -60,19 +60,14 @@ public class ProfileActivity extends Activity {
         textName = (TextView) findViewById(R.id.textName);
         textPhone = (TextView) findViewById(R.id.textPhone);
 
-
-        if(sharedPreferences.getString(user_Name,"").isEmpty() || sharedPreferences.getString(user_Phone,"").isEmpty()) {
-            profileSet();
-        }
-        else {
-            saveAction();
-        }
-
+        profileSet();
 
         editProfile.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                editAction();
+             editName.setText(sharedPreferences.getString(user_Name, "").toString());
+             editPhone.setText(sharedPreferences.getString(user_Phone, "").toString());
+             editAction();
             }
         });
 
@@ -98,25 +93,23 @@ public class ProfileActivity extends Activity {
             nv.setTextColor(Color.WHITE);nametoast.show();
         }
 
-//       else if( newPhone.length() < 11)
-//        {
-//            editAction();
-//            Toast phonetoast = Toast.makeText(this, "Phone number must be 11 digit", Toast.LENGTH_LONG);
-//            TextView pv = (TextView) phonetoast.getView().findViewById(android.R.id.message);
-//            pv.setTextColor(Color.WHITE);phonetoast.show();
-//        }
-
-        if(!newName.isEmpty() && !newPhone.isEmpty())// && newPhone.length() == 11)
+       else if( newPhone.length() < 11)
         {
-            String deviceID = sharedPreferences.getString(device_Id,"");
-            String url = getString(R.string.local_base_url)+"info/"+deviceID+"";
+            editAction();
+            Toast phonetoast = Toast.makeText(this, "Phone number must be 11 digit", Toast.LENGTH_LONG);
+            TextView pv = (TextView) phonetoast.getView().findViewById(android.R.id.message);
+            pv.setTextColor(Color.WHITE);phonetoast.show();
+        }
+
+        if(!newName.isEmpty() && !newPhone.isEmpty() && newPhone.length() == 11)
+        {
+            String url = getString(R.string.local_base_url)+"info/"+sharedPreferences.getString(device_Id,"")+"";
 
             RequestQueue requestQueue = Volley.newRequestQueue(ProfileActivity.this);
             StringRequest postRequest = new StringRequest(Request.Method.POST, url,
                     new Response.Listener<String>() {
                         @Override
                         public void onResponse(String response) {
-
                             try
                             {
                                 JSONObject jsonResponse = new JSONObject(response);
@@ -129,12 +122,12 @@ public class ProfileActivity extends Activity {
                                     editor.commit();
 
                                     saveAction();
-                                    textName.setText(sharedPreferences.getString(user_Name, "").toString());
-                                    textPhone.setText(sharedPreferences.getString(user_Phone, "").toString());
                                 }
                                 else if(statCode.equals("404"))
                                 {
-
+                                    Toast nametoast = Toast.makeText(ProfileActivity.this, "Something wrong occured", Toast.LENGTH_LONG);
+                                    TextView nv = (TextView) nametoast.getView().findViewById(android.R.id.message);
+                                    nv.setTextColor(Color.WHITE);nametoast.show();
                                 }
                             }
                             catch (Exception e)
@@ -173,28 +166,30 @@ public class ProfileActivity extends Activity {
                 new Response.Listener<String>() {
                     @Override
                     public void onResponse(String response) {
-                        try
-                        {
+                        try {
                             JSONObject jsonResponse = new JSONObject(response);
                             String statCode = jsonResponse.getString("code");
-                            JSONObject Data = jsonResponse.getJSONObject("data");
 
-                            if(statCode.equals("200"))
-                            {
+                            if(statCode.equals("200")) {
+                                JSONObject Data = jsonResponse.getJSONObject("data");
                                 String userName = Data.getString("User_name");
                                 String userPhone = Data.getString("Phone_number");
 
-                                if(!userName.isEmpty() && !userPhone.isEmpty()) {
-
+                                if(!userPhone.isEmpty() && !userPhone.equals(null)) {
                                     editor.putString(user_Name, userName);
                                     editor.putString(user_Phone, userPhone);
                                     editor.commit();
-
                                     saveAction();
                                 }
-                                else if(userName.isEmpty() || userPhone.isEmpty()) {
+                               else {
+                                    editor.putString(user_Name, "");
+                                    editor.putString(user_Phone, "");
+                                    editor.commit();
                                     editAction();
                                 }
+                            }
+
+                           else if(statCode.equals("404")) {
                             }
                         }
                         catch (Exception e)
@@ -213,7 +208,6 @@ public class ProfileActivity extends Activity {
     }
 
     private void saveAction() {
-
         editName.setVisibility(View.GONE);
         editPhone.setVisibility(View.GONE);
         saveProfile.setVisibility(View.GONE);
@@ -226,15 +220,11 @@ public class ProfileActivity extends Activity {
     }
 
     private void editAction() {
-
         textName.setVisibility(View.GONE);
         textPhone.setVisibility(View.GONE);
         editProfile.setVisibility(View.GONE);
         editName.setVisibility(View.VISIBLE);
         editPhone.setVisibility(View.VISIBLE);
         saveProfile.setVisibility(View.VISIBLE);
-
-        editName.setText(sharedPreferences.getString(user_Name, "").toString());
-        editPhone.setText(sharedPreferences.getString(user_Phone, "").toString());
     }
 }

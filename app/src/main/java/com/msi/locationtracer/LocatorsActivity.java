@@ -43,7 +43,7 @@ public class LocatorsActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.locators_list);
-        setTitle("Peoples");
+        setTitle("Peoples Connected");
 
         sharedPreferences =getSharedPreferences(Shared_Name, Context.MODE_PRIVATE);
         editor = sharedPreferences.edit();

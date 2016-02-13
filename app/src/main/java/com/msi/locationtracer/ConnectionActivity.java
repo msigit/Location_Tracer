@@ -63,13 +63,13 @@ public class ConnectionActivity extends Activity {
     }
 
     private void ConnectPeople() {
-        if (sharedPreferences.getString(user_Phone, "").isEmpty()) {
+        if (sharedPreferences.getString(user_Phone, "").isEmpty() || sharedPreferences.getString(user_Phone, "").equals(null)) {
             Toast phonetoast = Toast.makeText(ConnectionActivity.this, "Please set your profile to connect others", Toast.LENGTH_LONG);
             TextView pv = (TextView) phonetoast.getView().findViewById(android.R.id.message);
             pv.setTextColor(Color.WHITE);
             phonetoast.show();
         }
-        else if (!sharedPreferences.getString(user_Phone, "").isEmpty()) {
+        else if (!sharedPreferences.getString(user_Phone, "").isEmpty() || !sharedPreferences.getString(user_Phone, "").equals(null)) {
             String connectionPhone = connectPhone.getText().toString().trim();
 
 //        if( connectionPhone.length() < 11)
